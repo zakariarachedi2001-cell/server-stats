@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minecraft Server Status Checker</title>
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <nav class="top-bar">
+    <div class="live-badge" id="liveBadge" hidden>
+      <span class="pulse-dot"></span>
+      <span id="liveText">LIVE • 1s</span>
+    </div>
+    <button type="button" id="themeToggle" class="mc-btn small" aria-label="Toggle Light/Dark Theme">
+      <span id="themeIcon">☀️</span> <span id="themeLabel">Light Mode</span>
+    </button>
+  </nav>
+
+  <header>
+    <img src="/static/logo.svg" alt="Server Checker Logo" class="logo">
+    <h1>Minecraft Server Checker</h1>
+    <p class="sub">Real-time server status, live player tracking, MOTD & icon inspector</p>
+  </header>
+
+  <section class="panel">
+    <div class="edition" role="radiogroup" aria-label="Server Edition">
+      <button type="button" class="mc-btn active" data-type="java" role="radio" aria-checked="true">Java Edition</button>
+      <button type="button" class="mc-btn" data-type="bedrock" role="radio" aria-checked="false">Bedrock Edition</button>
+    </div>
+    <div class="row">
+      <input id="addr" class="mc-input" placeholder="play.example.net or ip:port" autocomplete="off" spellcheck="false">
+      <button id="go" class="mc-btn green">Check</button>
+      <button id="stopBtn" class="mc-btn red" hidden>Stop</button>
+    </div>
+    <p id="msg" class="msg" hidden></p>
+  </section>
+
+  <section id="result" hidden>
+    <div class="panel stats-panel">
+      <div class="stat-grid">
+        <div class="stat-box">
+          <span class="stat-label">STATUS</span>
+          <span id="statStatus" class="stat-value online-txt">ONLINE</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">PLAYERS</span>
+          <span id="statPlayers" class="stat-value">0 / 0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">PING</span>
+          <span id="statPing" class="stat-value">0 ms</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">LAST SYNC</span>
+          <span id="statSync" class="stat-value">Just now</span>
+        </div>
+      </div>
+      <div class="xp-bar-wrap" title="Player Capacity">
+        <div id="xpFill" class="xp-bar-fill" style="width: 0%"></div>
+        <span id="xpLabel" class="xp-bar-text">0% Capacity</span>
+      </div>
+    </div>
+
+    <div class="listing">
+      <img id="icon" class="icon" alt="Server Icon" width="64" height="64">
+      <div class="listing-text">
+        <div class="line1"><span id="lname"></span><span id="lcount" class="count"></span></div>
+        <div id="motd" class="motd"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a id="dl" class="mc-btn small" download hidden>Download Icon (PNG)</a>
+      <span id="noicon" class="hint" hidden>Bedrock servers do not provide custom icons</span>
+    </div>
+
+    <div class="panel">
+      <h2>Server Information</h2>
+      <dl id="info" class="info"></dl>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="ptitle">Online Players</h2>
+        <span id="playerBadge" class="count-pill">0</span>
+      </div>
+      <div id="activityFeed" class="activity-feed" hidden></div>
+      <ul id="players" class="players"></ul>
+      <p id="pnote" class="hint"></p>
+    </div>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

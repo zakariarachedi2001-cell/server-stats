@@ -543,3 +543,230 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .obf, .pulse-dot { animation: none; }
 }
+
+/* ---- Visitor counter: live dot + change animation ---- */
+.visitor-dot {
+  width: 8px;
+  height: 8px;
+  background: #55ff55;
+  border: 2px solid #000;
+  animation: pulse 1s steps(2) infinite;
+}
+
+.visitor-badge strong.bump {
+  animation: bump 0.45s steps(4);
+}
+
+@keyframes bump {
+  0% { transform: translateY(0); color: #fff; }
+  40% { transform: translateY(-4px); color: #7ce34b; }
+  100% { transform: translateY(0); }
+}
+
+/* ---- Tool tiles (Creeper = servers, Steve = players) ---- */
+.hub {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 12px 14px;
+  color: var(--ink);
+  background: var(--panel-bg);
+  border: 4px solid var(--border-col);
+  box-shadow: inset 4px 4px 0 var(--panel-highlight), inset -4px -4px 0 var(--panel-shadow);
+  cursor: url('/static/cursor.png') 13 2, pointer;
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+
+.tile:hover {
+  transform: translateY(-3px);
+  background: var(--panel-highlight);
+}
+
+.tile:active {
+  transform: translateY(1px);
+}
+
+.tile.active {
+  border-color: var(--grass);
+  box-shadow: inset 4px 4px 0 var(--grass-light), inset -4px -4px 0 var(--grass-dark), 0 0 0 3px var(--border-col);
+}
+
+.tile:focus-visible {
+  outline: 3px solid var(--accent-gold);
+  outline-offset: 3px;
+}
+
+.tile-head {
+  width: 80px;
+  height: 80px;
+  image-rendering: pixelated;
+  border: 4px solid var(--border-col);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+}
+
+.tile-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  color: var(--accent-gold);
+}
+
+.tile-sub {
+  font-family: 'Silkscreen', monospace;
+  font-size: 12px;
+  color: var(--sub-ink);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---- Player lookup ---- */
+.prompt-title {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.prompt-hint {
+  margin-bottom: 14px;
+}
+
+.player-card {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+
+.skin-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.skin-stage {
+  background: var(--motd-bg);
+  border: 4px solid var(--border-col);
+  box-shadow: inset 3px 3px 0 #262930;
+  padding: 14px 22px;
+}
+
+.skin-canvas {
+  display: block;
+  width: 128px;
+  height: 256px;
+  image-rendering: pixelated;
+}
+
+.skin-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.player-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-head-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.head-canvas {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  image-rendering: pixelated;
+  border: 4px solid var(--border-col);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+  background: #1c1f24;
+}
+
+.player-name {
+  font-size: 16px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.badge {
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  color: var(--accent-green);
+  background: var(--card-bg);
+  border: 2px solid var(--border-col);
+  padding: 2px 8px;
+}
+
+.actions.wrap {
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.player-info {
+  grid-template-columns: 1fr;
+}
+
+.player-info > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 12px;
+  align-items: center;
+}
+
+.player-info dt {
+  grid-column: 1 / -1;
+}
+
+.copy-btn {
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--panel-highlight);
+  border: 2px solid var(--border-col);
+  padding: 3px 8px;
+  min-width: 68px;
+  cursor: url('/static/cursor.png') 13 2, pointer;
+}
+
+.copy-btn:hover {
+  background: var(--grass);
+  color: #fff;
+}
+
+.copy-btn:focus-visible {
+  outline: 3px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .hub { gap: 10px; }
+  .tile-head { width: 64px; height: 64px; }
+  .tile-title { font-size: 11px; }
+  .player-card { flex-direction: column; align-items: center; }
+  .player-main { width: 100%; }
+  .player-info > div { grid-template-columns: 1fr; row-gap: 6px; }
+  .copy-btn { justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visitor-dot, .visitor-badge strong.bump { animation: none; }
+  .tile { transition: none; }
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Minecraft Server Status Checker</title>
+  <title>Minecraft Server &amp; Player Checker</title>
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,6 +17,7 @@
       <span class="visitor-icon" aria-hidden="true">👥</span>
       <span class="visitor-label">VISITORS</span>
       <strong id="visitorCount">—</strong>
+      <span class="visitor-dot" title="Updates every second" aria-hidden="true"></span>
     </div>
     <div class="live-badge" id="liveBadge" hidden>
       <span class="pulse-dot"></span>
@@ -29,9 +30,24 @@
 
   <header>
     <img src="/static/logo.svg" alt="Server Checker Logo" class="logo">
-    <h1>Minecraft Server Checker</h1>
-    <p class="sub">Real-time server status, live player tracking, MOTD & icon inspector</p>
+    <h1>Minecraft Checker</h1>
+    <p class="sub">Live server status &bull; Player UUID, skin &amp; cape lookup</p>
   </header>
+
+  <div class="hub" role="tablist" aria-label="Tools">
+    <button type="button" class="tile active" id="tabServer" data-view="server" role="tab" aria-selected="true" aria-controls="view-server">
+      <img src="/static/creeper.svg" alt="" class="tile-head" width="80" height="80">
+      <span class="tile-title">SERVERS</span>
+      <span class="tile-sub">Status, MOTD &amp; icon</span>
+    </button>
+    <button type="button" class="tile" id="tabPlayer" data-view="player" role="tab" aria-selected="false" aria-controls="view-player">
+      <img src="/static/steve.svg" alt="" class="tile-head" width="80" height="80">
+      <span class="tile-title">PLAYERS</span>
+      <span class="tile-sub">UUID, skin &amp; more</span>
+    </button>
+  </div>
+
+  <div id="view-server" role="tabpanel" aria-labelledby="tabServer">
 
   <section class="panel">
     <div class="edition" role="radiogroup" aria-label="Server Edition">
@@ -100,6 +116,54 @@
       <p id="pnote" class="hint"></p>
     </div>
   </section>
+  </div>
+
+  <div id="view-player" role="tabpanel" aria-labelledby="tabPlayer" hidden>
+    <section class="panel">
+      <h2 class="prompt-title">Enter a player name</h2>
+      <p class="hint prompt-hint">Java Edition username or UUID &mdash; shows UUID, skin download and more.</p>
+      <div class="row">
+        <input id="pname" class="mc-input" placeholder="Notch, jeb_ or a UUID" autocomplete="off" spellcheck="false" maxlength="40">
+        <button id="pgo" class="mc-btn green">Search</button>
+      </div>
+      <p id="pmsg" class="msg" hidden></p>
+    </section>
+
+    <section id="presult" hidden>
+      <div class="panel player-card">
+        <div class="skin-view">
+          <div class="skin-stage">
+            <canvas id="skinCanvas" class="skin-canvas" width="16" height="32" aria-label="Player skin preview"></canvas>
+          </div>
+          <div class="skin-toggle">
+            <button type="button" class="mc-btn small active" id="viewFront">Front</button>
+            <button type="button" class="mc-btn small" id="viewBack">Back</button>
+          </div>
+        </div>
+        <div class="player-main">
+          <div class="player-head-row">
+            <canvas id="headCanvas" class="head-canvas" width="8" height="8" aria-hidden="true"></canvas>
+            <div>
+              <h2 id="pdName" class="player-name">Name</h2>
+              <p id="pdBadges" class="badges"></p>
+            </div>
+          </div>
+          <div class="actions wrap">
+            <a id="dlSkin" class="mc-btn small green" hidden>Download Skin</a>
+            <button type="button" id="dlHead" class="mc-btn small" hidden>Download Head</button>
+            <a id="dlCape" class="mc-btn small" hidden>Download Cape</a>
+            <a id="namemc" class="mc-btn small" target="_blank" rel="noopener noreferrer">NameMC</a>
+          </div>
+          <p id="pdNote" class="hint" hidden></p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Player Information</h2>
+        <dl id="pInfo" class="info player-info"></dl>
+      </div>
+    </section>
+  </div>
 </main>
 <script src="/static/app.js"></script>
 </body>

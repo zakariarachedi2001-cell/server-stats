@@ -5,20 +5,51 @@ let isPolling = false;
 let currentTarget = null;
 let previousPlayers = new Set();
 let activityLog = [];
+let currentView = 'server';
 
-// Count each browser once using a first-party, long-lived cookie.
-async function loadVisitorCount() {
-  const countEl = $('#visitorCount');
+// ---- Visitor counter -------------------------------------------------------
+// The browser is registered once (first-party cookie, no IPs), then the count is
+// refreshed every second. Polling pauses while the tab is hidden.
+const VISITOR_POLL_MS = 1000;
+let lastVisitorCount = null;
+
+function showVisitorCount(value) {
+  const el = $('#visitorCount');
+  const n = Number(value || 0);
+  if (n === lastVisitorCount) return;
+  el.textContent = n.toLocaleString();
+  if (lastVisitorCount !== null) {
+    el.classList.remove('bump');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('bump');
+  }
+  lastVisitorCount = n;
+}
+
+async function registerVisitor() {
   try {
-    const response = await fetch('/api/visitors', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Visitor counter unavailable');
-    const data = await response.json();
-    countEl.textContent = Number(data.unique_visitors || 0).toLocaleString();
+    const r = await fetch('/api/visitors', { cache: 'no-store' });
+    if (!r.ok) throw new Error('unavailable');
+    showVisitorCount((await r.json()).unique_visitors);
   } catch {
-    countEl.textContent = '—';
+    if (lastVisitorCount === null) $('#visitorCount').textContent = '—';
   }
 }
-loadVisitorCount();
+
+let visitorTimer = null;
+async function pollVisitors() {
+  clearTimeout(visitorTimer);
+  if (!document.hidden) {
+    try {
+      const r = await fetch('/api/visitors/count', { cache: 'no-store' });
+      if (r.ok) showVisitorCount((await r.json()).unique_visitors);
+    } catch { /* keep the last known value */ }
+  }
+  visitorTimer = setTimeout(pollVisitors, VISITOR_POLL_MS);
+}
+
+registerVisitor().finally(pollVisitors);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pollVisitors(); });
 
 // Theme Management (Dark / Light Mode)
 const savedTheme = localStorage.getItem('mc_checker_theme') || 'dark';
@@ -152,16 +183,22 @@ async function startTracking() {
   await fetchStatus(true);
 }
 
+function scheduleNext(target) {
+  if (currentTarget !== target || currentView !== 'server') return;
+  pollTimer = setTimeout(() => fetchStatus(false), 1000);
+}
+
 async function fetchStatus(isInitial = false) {
   if (!currentTarget || isPolling) return;
   isPolling = true;
-  const { address, type: targetType } = currentTarget;
+  const target = currentTarget;
+  const { address, type: targetType } = target;
 
   try {
     const r = await fetch(`/api/status?type=${targetType}&address=${encodeURIComponent(address)}`);
     const d = await r.json();
 
-    if (!currentTarget || currentTarget.address !== address) return;
+    if (currentTarget !== target) return;
 
     if (d.error) {
       if (isInitial) {
@@ -169,22 +206,29 @@ async function fetchStatus(isInitial = false) {
         showMsg(d.error);
         stopTracking();
       } else {
+        // Keep polling so the page recovers by itself when the server comes back.
         $('#statStatus').textContent = 'OFFLINE';
         $('#statStatus').className = 'stat-value offline-txt';
+        $('#liveText').textContent = 'RETRYING • 1s';
+        scheduleNext(target);
       }
       return;
     }
 
     showMsg('');
+    $('#liveText').textContent = 'LIVE • 1s';
     $('#liveBadge').hidden = false;
     $('#stopBtn').hidden = false;
     render(d, isInitial);
-
-    pollTimer = setTimeout(() => fetchStatus(false), 1000);
+    scheduleNext(target);
   } catch {
+    if (currentTarget !== target) return;
     if (isInitial) {
       showMsg('Failed to connect to the backend service.');
       stopTracking();
+    } else {
+      $('#liveText').textContent = 'RECONNECTING';
+      scheduleNext(target);
     }
   } finally {
     isPolling = false;
@@ -283,3 +327,250 @@ function render(d, isInitial) {
         ? 'Bedrock Edition servers only report player counts, not individual player names.'
         : (d.players_online ? 'This server hides its online player list.' : 'No players currently online.'));
 }
+
+// ---- Tabs (Creeper = servers, Steve = players) ------------------------------
+function setView(view, updateHash = true) {
+  if (view !== 'server' && view !== 'player') view = 'server';
+  const previous = currentView;
+  currentView = view;
+  document.querySelectorAll('.tile').forEach(t => {
+    const on = t.dataset.view === view;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', on);
+  });
+  $('#view-server').hidden = view !== 'server';
+  $('#view-player').hidden = view !== 'player';
+  if (updateHash && location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
+
+  if (view === 'player') {
+    // Pause live server polling (and hide its LIVE badge) while the player tab is open.
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    $('#liveBadge').hidden = true;
+    if (previous !== 'player') setTimeout(() => $('#pname').focus(), 0);
+  } else if (previous === 'player' && currentTarget && !pollTimer) {
+    $('#liveBadge').hidden = false;
+    fetchStatus(false);
+  }
+}
+document.querySelectorAll('.tile').forEach(t => t.onclick = () => setView(t.dataset.view));
+window.addEventListener('hashchange', () => setView(location.hash.slice(1), false));
+
+// ---- Player lookup -----------------------------------------------------------
+let playerData = null;
+let skinImage = null;
+let skinSide = 'front';
+
+const pmsg = t => { $('#pmsg').textContent = t; $('#pmsg').hidden = !t; };
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// Draws a 16x32 (x k) front or back view of a 64x64 / 64x32 skin.
+function drawSkin(canvas, img, slim, side) {
+  const k = img.width / 64;
+  const legacy = img.height <= img.width / 2;
+  canvas.width = 16 * k;
+  canvas.height = 32 * k;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const blit = (sx, sy, w, h, dx, dy, flip = false) => {
+    ctx.save();
+    if (flip) { ctx.translate((dx + w) * k, dy * k); ctx.scale(-1, 1); dx = 0; dy = 0; }
+    ctx.drawImage(img, sx * k, sy * k, w * k, h * k, dx * k, dy * k, w * k, h * k);
+    ctx.restore();
+  };
+
+  const aw = slim ? 3 : 4;
+  const front = side === 'front';
+
+  // source x of an arm's front/back face (right arm / left arm)
+  const rArm = front ? 44 : (slim ? 51 : 52);
+  const lArm = front ? 36 : (slim ? 43 : 44);
+  const lSleeve = front ? 52 : (slim ? 59 : 60);
+
+  // Layout in the picture: viewer's left holds the player's RIGHT arm/leg from the front,
+  // and the player's LEFT arm/leg from the back.
+  const leftArmX = slim ? 1 : 0, rightArmX = 12;
+
+  // Base layer
+  blit(front ? 8 : 24, 8, 8, 8, 4, 0);                    // head
+  blit(front ? 20 : 32, 20, 8, 12, 4, 8);                 // body
+  if (front) {
+    blit(rArm, 20, aw, 12, leftArmX, 8);                  // right arm
+    legacy ? blit(rArm, 20, aw, 12, rightArmX, 8, true) : blit(lArm, 52, aw, 12, rightArmX, 8);
+    blit(4, 20, 4, 12, 4, 20);                            // right leg
+    legacy ? blit(4, 20, 4, 12, 8, 20, true) : blit(20, 52, 4, 12, 8, 20);
+  } else {
+    legacy ? blit(rArm, 20, aw, 12, leftArmX, 8, true) : blit(lArm, 52, aw, 12, leftArmX, 8);
+    blit(rArm, 20, aw, 12, rightArmX, 8);
+    legacy ? blit(12, 20, 4, 12, 4, 20, true) : blit(28, 52, 4, 12, 4, 20);
+    blit(12, 20, 4, 12, 8, 20);
+  }
+
+  // Overlay layer (hat, jacket, sleeves, pants)
+  blit(front ? 40 : 56, 8, 8, 8, 4, 0);
+  if (!legacy) {
+    blit(front ? 20 : 32, 36, 8, 12, 4, 8);
+    if (front) {
+      blit(rArm, 36, aw, 12, leftArmX, 8);
+      blit(lSleeve, 52, aw, 12, rightArmX, 8);
+      blit(4, 36, 4, 12, 4, 20);
+      blit(4, 52, 4, 12, 8, 20);
+    } else {
+      blit(lSleeve, 52, aw, 12, leftArmX, 8);
+      blit(rArm, 36, aw, 12, rightArmX, 8);
+      blit(12, 52, 4, 12, 4, 20);
+      blit(12, 36, 4, 12, 8, 20);
+    }
+  }
+}
+
+function drawHead(canvas, img, size) {
+  const k = img.width / 64;
+  const tmp = document.createElement('canvas');
+  tmp.width = tmp.height = 8 * k;
+  const t = tmp.getContext('2d');
+  t.imageSmoothingEnabled = false;
+  t.drawImage(img, 8 * k, 8 * k, 8 * k, 8 * k, 0, 0, 8 * k, 8 * k);
+  t.drawImage(img, 40 * k, 8 * k, 8 * k, 8 * k, 0, 0, 8 * k, 8 * k);
+  canvas.width = canvas.height = size;
+  const c = canvas.getContext('2d');
+  c.imageSmoothingEnabled = false;
+  c.drawImage(tmp, 0, 0, size, size);
+}
+
+function setSkinSide(side) {
+  skinSide = side;
+  $('#viewFront').classList.toggle('active', side === 'front');
+  $('#viewBack').classList.toggle('active', side === 'back');
+  if (skinImage && playerData) drawSkin($('#skinCanvas'), skinImage, playerData.skin_model === 'slim', side);
+}
+$('#viewFront').onclick = () => setSkinSide('front');
+$('#viewBack').onclick = () => setSkinSide('back');
+
+async function searchPlayer() {
+  const query = $('#pname').value.trim();
+  if (!query) return pmsg('Please enter a player name first.');
+  pmsg('');
+  const btn = $('#pgo');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await fetch(`/api/player?query=${encodeURIComponent(query)}`);
+    const d = await r.json();
+    if (!r.ok || d.error) {
+      $('#presult').hidden = true;
+      return pmsg(d.error || 'Something went wrong. Please try again.');
+    }
+    await renderPlayer(d);
+  } catch {
+    $('#presult').hidden = true;
+    pmsg('Failed to connect to the backend service.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Search';
+  }
+}
+$('#pgo').onclick = searchPlayer;
+$('#pname').addEventListener('keydown', e => e.key === 'Enter' && searchPlayer());
+
+function copyRow(label, value, copyable = true) {
+  const div = document.createElement('div');
+  const dt = document.createElement('dt'); dt.textContent = label;
+  const dd = document.createElement('dd'); dd.textContent = value;
+  div.append(dt, dd);
+  if (copyable && value !== null && value !== undefined) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'copy-btn'; b.textContent = 'COPY';
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(String(value)); b.textContent = 'COPIED'; }
+      catch { b.textContent = 'FAILED'; }
+      setTimeout(() => (b.textContent = 'COPY'), 1200);
+    };
+    div.appendChild(b);
+  }
+  return div;
+}
+
+async function renderPlayer(d) {
+  playerData = d;
+  skinImage = null;
+  $('#presult').hidden = false;
+  $('#pdName').textContent = d.name;
+
+  const badges = [d.skin_model === 'slim' ? 'SLIM (ALEX)' : 'CLASSIC (STEVE)'];
+  if (d.cape_hash) badges.push('HAS CAPE');
+  if (d.legacy) badges.push('LEGACY ACCOUNT');
+  $('#pdBadges').innerHTML = badges.map(b => `<span class="badge">${esc(b)}</span>`).join('');
+  $('#namemc').href = d.namemc_url;
+
+  const dlSkin = $('#dlSkin'), dlCape = $('#dlCape'), dlHead = $('#dlHead'), note = $('#pdNote');
+  dlSkin.hidden = dlCape.hidden = dlHead.hidden = true;
+  note.hidden = true;
+
+  if (d.skin_hash) {
+    const base = `/api/texture/${d.skin_hash}.png`;
+    dlSkin.href = `${base}?download=1&name=${encodeURIComponent(d.name + '-skin')}`;
+    dlSkin.hidden = false;
+    try {
+      skinImage = await loadImage(base);
+      drawHead($('#headCanvas'), skinImage, 64);
+      setSkinSide(skinSide);
+      dlHead.hidden = false;
+    } catch {
+      note.textContent = 'The skin image could not be loaded right now.';
+      note.hidden = false;
+    }
+  } else {
+    // No custom skin returned: show the default look.
+    const fallback = await loadImage('/static/steve.svg').catch(() => null);
+    const hc = $('#headCanvas'); hc.width = hc.height = 64;
+    if (fallback) { const c = hc.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(fallback, 0, 0, 64, 64); }
+    $('#skinCanvas').getContext('2d').clearRect(0, 0, 999, 999);
+    note.textContent = 'This player uses a default skin, so there is no custom skin file to download.';
+    note.hidden = false;
+  }
+
+  if (d.cape_hash) {
+    dlCape.href = `/api/texture/${d.cape_hash}.png?download=1&name=${encodeURIComponent(d.name + '-cape')}`;
+    dlCape.hidden = false;
+  }
+
+  const rows = [
+    ['Username', d.name],
+    ['UUID', d.uuid],
+    ['UUID (no dashes)', d.uuid_compact],
+    ['UUID (int array)', `[I; ${d.uuid_ints.join(', ')}]`],
+    ['Offline-mode UUID', d.offline_uuid],
+    ['Skin model', d.skin_model === 'slim' ? 'Slim (3px arms)' : 'Classic (4px arms)', false],
+    ['Cape', d.cape_hash ? 'Yes' : 'No', false],
+    ['Skin URL', d.skin_url],
+    ['Cape URL', d.cape_url],
+    ['Textures updated', d.textures_updated ? new Date(d.textures_updated).toLocaleString() : null, false],
+  ];
+  const info = $('#pInfo');
+  info.innerHTML = '';
+  rows.filter(r => r[1] !== null && r[1] !== undefined && r[1] !== '')
+      .forEach(([k, v, copyable]) => info.appendChild(copyRow(k, v, copyable !== false)));
+}
+
+$('#dlHead').onclick = () => {
+  if (!skinImage || !playerData) return;
+  const c = document.createElement('canvas');
+  drawHead(c, skinImage, 512);
+  c.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${playerData.name}-head.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, 'image/png');
+};
+
+setView(location.hash.slice(1), false);

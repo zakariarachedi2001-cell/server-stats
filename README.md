@@ -1,4 +1,4 @@
-# Minecraft Server Stats
+# Minecraft Server & Player Checker
 
 ## Run locally
 ```bash
@@ -7,8 +7,17 @@ python server.py
 ```
 Open http://127.0.0.1:5000
 
+## Tools
+The two tiles at the top switch between tools (also reachable via `#server` / `#player`):
+- **Creeper tile - Servers:** live Java/Bedrock status refreshed every second, MOTD, icon download.
+- **Steve tile - Players:** enter a Java username or UUID to see the UUID (dashed, compact, int-array),
+  offline-mode UUID, skin model, cape, front/back skin preview, and download the skin, head or cape.
+  Data comes from Mojang's public API (cached for 2 minutes); skins are proxied through
+  `/api/texture/<hash>.png` so they can be previewed and downloaded.
+
 ## Unique visitor counter
-The top bar displays unique browsers. A first-party random cookie is kept for one year,
+The top bar displays unique browsers and refreshes every second (`/api/visitors/count`, read-only;
+polling pauses while the tab is hidden). A first-party random cookie is kept for one year,
 so refreshing or reopening the site in the same browser does not add another visitor.
 No IP addresses are stored.
 

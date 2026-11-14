@@ -24,10 +24,12 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 
-from flask import Flask, Response, jsonify, make_response, request, send_from_directory
+from flask import Flask, Response, jsonify, make_response, request, send_from_directory, send_file
 from mcstatus import BedrockServer, JavaServer
+from PIL import UnidentifiedImageError
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+app.config["MAX_CONTENT_LENGTH"] = 9 * 1024 * 1024
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ALLOW_PRIVATE = os.environ.get("ALLOW_PRIVATE") == "1"
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
@@ -449,6 +451,104 @@ def texture(texture_hash):
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", request.args.get("name", "texture"))[:40] or "texture"
         resp.headers["Content-Disposition"] = f'attachment; filename="{safe}.png"'
     return resp
+
+
+# --------------------------------------------------------------------------- #
+# Pixel Art -> Litematica schematic
+# --------------------------------------------------------------------------- #
+PIXEL_MAX_UPLOAD = 8 * 1024 * 1024
+PIXEL_MAX_RESOLUTION = 128
+
+# Approximate in-game block colors. The same palette is mirrored in pixel-art.js
+# so the browser preview matches the generated schematic.
+PIXEL_COLORS = [
+    (207, 213, 214, "white"), (142, 142, 134, "light_gray"),
+    (62, 68, 71, "gray"), (8, 10, 15, "black"),
+    (115, 71, 42, "brown"), (161, 39, 34, "red"),
+    (224, 97, 0, "orange"), (241, 175, 21, "yellow"),
+    (94, 168, 24, "lime"), (73, 91, 36, "green"),
+    (21, 137, 145, "cyan"), (58, 175, 217, "light_blue"),
+    (53, 57, 157, "blue"), (122, 42, 173, "purple"),
+    (189, 68, 179, "magenta"), (237, 141, 172, "pink"),
+]
+
+@app.route("/api/pixel-art/export", methods=["POST"])
+def export_pixel_art():
+    upload = request.files.get("image")
+    if not upload or not upload.filename:
+        return jsonify(error="Choose an image first."), 400
+    raw = upload.stream.read(PIXEL_MAX_UPLOAD + 1)
+    if len(raw) > PIXEL_MAX_UPLOAD:
+        return jsonify(error="Image is too large. Maximum size is 8 MB."), 413
+    if not raw:
+        return jsonify(error="The uploaded image is empty."), 400
+
+    try:
+        resolution = int(request.form.get("resolution", "64"))
+        depth = int(request.form.get("depth", "1"))
+    except (TypeError, ValueError):
+        return jsonify(error="Invalid resolution or depth."), 400
+    family = request.form.get("palette", "concrete").lower()
+    if resolution not in (16, 32, 48, 64, 96, 128) or not 1 <= depth <= 4:
+        return jsonify(error="Choose a supported resolution and depth."), 400
+    if family not in ("concrete", "wool", "terracotta"):
+        return jsonify(error="Invalid block palette."), 400
+
+    try:
+        from PIL import Image, ImageOps
+        from io import BytesIO
+        from litemapy import Region, BlockState
+        import tempfile
+        image = Image.open(BytesIO(raw))
+        if image.width * image.height > 20_000_000:
+            return jsonify(error="Image dimensions are too large. Please use an image under 20 megapixels."), 400
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        image.thumbnail((2048, 2048), Image.Resampling.LANCZOS)
+        # Fit to a square canvas without stretching the source image.
+        fitted = ImageOps.fit(image, (resolution, resolution), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+        pixels = fitted.load()
+
+        region = Region(0, 0, 0, resolution, resolution, depth)
+        block_cache = {}
+        for py in range(resolution):
+            y = resolution - 1 - py
+            for x in range(resolution):
+                rgb = pixels[x, py]
+                nearest = min(PIXEL_COLORS, key=lambda c: (c[0]-rgb[0])**2 + (c[1]-rgb[1])**2 + (c[2]-rgb[2])**2)
+                block_name = f"minecraft:{nearest[3]}_{family}"
+                block = block_cache.get(block_name)
+                if block is None:
+                    block = BlockState(block_name)
+                    block_cache[block_name] = block
+                for z in range(depth):
+                    region[x, y, z] = block
+
+        schematic = region.as_schematic(
+            name="PixelCraft Art", author="PixelCraft Studio",
+            description=f"Generated from an image · {resolution}x{resolution} · {family}"
+        )
+        tmp = tempfile.NamedTemporaryFile(prefix="pixelcraft-", suffix=".litematic", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+        try:
+            schematic.save(tmp_path)
+            response = send_file(tmp_path, mimetype="application/octet-stream",
+                                 as_attachment=True, download_name="pixelcraft-art.litematic")
+            response.call_on_close(lambda: os.path.exists(tmp_path) and os.remove(tmp_path))
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
+    except (ValueError, UnidentifiedImageError):
+        return jsonify(error="This image could not be read. Try a PNG, JPG or WEBP file."), 400
+    except ImportError:
+        app.logger.exception("Pixel Art dependencies are missing")
+        return jsonify(error="Pixel Art export is not installed on the server. Install the requirements and redeploy."), 503
+    except Exception:
+        app.logger.exception("Pixel Art schematic export failed")
+        return jsonify(error="Could not create the schematic. Please try another image."), 500
 
 
 if __name__ == "__main__":

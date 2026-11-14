@@ -45,6 +45,11 @@
       <span class="tile-title">PLAYERS</span>
       <span class="tile-sub">UUID, skin &amp; more</span>
     </button>
+    <button type="button" class="tile" id="tabPixel" data-view="pixel" role="tab" aria-selected="false" aria-controls="view-pixel">
+      <span class="pixel-tile-icon" aria-hidden="true">▦</span>
+      <span class="tile-title">PIXEL ART</span>
+      <span class="tile-sub">Image to Litematica</span>
+    </button>
   </div>
 
   <div id="view-server" role="tabpanel" aria-labelledby="tabServer">
@@ -164,7 +169,73 @@
       </div>
     </section>
   </div>
+
+  <div id="view-pixel" role="tabpanel" aria-labelledby="tabPixel" hidden>
+    <section class="panel pixel-panel">
+      <div class="pixel-heading">
+        <div>
+          <h2 class="prompt-title">PixelCraft Studio</h2>
+          <p class="hint">Turn an image into a Minecraft block build and export a real .litematic schematic.</p>
+        </div>
+        <span class="pixel-format">LITEMATICA</span>
+      </div>
+      <label class="pixel-upload" for="pixelFile" id="pixelDrop">
+        <span class="pixel-upload-icon">＋</span>
+        <strong>Choose an image</strong>
+        <span class="hint">PNG, JPG or WEBP · Up to 8 MB</span>
+        <input id="pixelFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+      </label>
+      <p id="pixelMsg" class="msg" hidden></p>
+      <div class="pixel-controls">
+        <label>Resolution
+          <select id="pixelResolution" class="mc-input">
+            <option value="16">16 × 16</option>
+            <option value="32">32 × 32</option>
+            <option value="48">48 × 48</option>
+            <option value="64" selected>64 × 64</option>
+            <option value="96">96 × 96</option>
+            <option value="128">128 × 128</option>
+          </select>
+        </label>
+        <label>Block palette
+          <select id="pixelPalette" class="mc-input">
+            <option value="concrete">Concrete</option>
+            <option value="wool">Wool</option>
+            <option value="terracotta">Terracotta</option>
+          </select>
+        </label>
+        <label>Build depth
+          <select id="pixelDepth" class="mc-input">
+            <option value="1">1 block · Flat wall</option>
+            <option value="2">2 blocks</option>
+            <option value="3">3 blocks</option>
+            <option value="4">4 blocks</option>
+          </select>
+        </label>
+      </div>
+      <div class="pixel-preview-wrap">
+        <div class="pixel-preview-head">
+          <strong>BUILD PREVIEW</strong>
+          <span id="pixelDimensions" class="hint">Waiting for image</span>
+        </div>
+        <div class="pixel-canvas-frame">
+          <canvas id="pixelCanvas" width="64" height="64" aria-label="Pixel art preview"></canvas>
+        </div>
+      </div>
+      <div class="pixel-stats" id="pixelStats" hidden>
+        <div class="stat-box"><span class="stat-label">WIDTH</span><span id="pixelStatWidth" class="stat-value">64</span></div>
+        <div class="stat-box"><span class="stat-label">HEIGHT</span><span id="pixelStatHeight" class="stat-value">64</span></div>
+        <div class="stat-box"><span class="stat-label">BLOCKS</span><span id="pixelStatBlocks" class="stat-value">4096</span></div>
+      </div>
+      <div class="actions wrap pixel-actions">
+        <button type="button" id="pixelDownload" class="mc-btn green" disabled>Download .LITEMATIC</button>
+        <span class="hint">Generated on the server only when you export.</span>
+      </div>
+      <p class="pixel-footnote">The schematic is a flat image wall (or an extruded wall when depth is increased). Import it in Litematica using the Schematic Manager.</p>
+    </section>
+  </div>
 </main>
 <script src="/static/app.js"></script>
+<script src="/static/pixel-art.js"></script>
 </body>
 </html>

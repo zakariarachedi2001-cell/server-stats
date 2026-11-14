@@ -566,7 +566,7 @@ h2 {
 /* ---- Tool tiles (Creeper = servers, Steve = players) ---- */
 .hub {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 22px;
 }
@@ -769,4 +769,41 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .visitor-dot, .visitor-badge strong.bump { animation: none; }
   .tile { transition: none; }
+}
+
+
+/* ---- PixelCraft Studio --------------------------------------------------- */
+.pixel-tile-icon {
+  width: 80px; height: 80px; display: grid; place-items: center;
+  color: var(--accent-gold); font: 700 58px/1 monospace;
+  background: repeating-conic-gradient(#6d8d42 0 25%, #47652c 0 50%) 0 / 20px 20px;
+  border: 4px solid var(--border-col); box-shadow: 4px 4px 0 rgba(0,0,0,.3);
+  text-shadow: 3px 3px 0 #202020;
+}
+.pixel-panel { display: flex; flex-direction: column; gap: 16px; }
+.pixel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pixel-format { flex: none; color: var(--accent-green); border: 2px solid var(--grass); padding: 5px 8px; font: 12px 'Silkscreen', monospace; }
+.pixel-upload { min-height: 150px; border: 3px dashed var(--input-border); background: var(--card-bg); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; cursor: pointer; text-align: center; padding: 18px; }
+.pixel-upload:hover, .pixel-upload.dragover { border-color: var(--accent-green); background: var(--panel-highlight); }
+.pixel-upload-icon { font: 48px/1 monospace; color: var(--accent-green); }
+.pixel-controls { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.pixel-controls label { display: flex; flex-direction: column; gap: 6px; color: var(--sub-ink); font: 12px 'Silkscreen', monospace; }
+.pixel-controls .mc-input { width: 100%; font-size: 12px; padding: 9px 7px; }
+.pixel-preview-wrap { border: 3px solid var(--border-col); background: var(--card-bg); padding: 12px; }
+.pixel-preview-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; font: 12px 'Silkscreen', monospace; }
+.pixel-canvas-frame { min-height: 260px; display: grid; place-items: center; padding: 14px; overflow: auto; background-color: #17191e; background-image: linear-gradient(45deg,#22262d 25%,transparent 25%),linear-gradient(-45deg,#22262d 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#22262d 75%),linear-gradient(-45deg,transparent 75%,#22262d 75%); background-size: 20px 20px; background-position: 0 0,0 10px,10px -10px,-10px 0; }
+#pixelCanvas { width: min(100%, 440px); height: auto; image-rendering: pixelated; image-rendering: crisp-edges; border: 2px solid #000; background: #17191e; }
+.pixel-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; }
+.pixel-actions { margin: 0; align-items: center; }
+.pixel-actions button { min-height: 44px; }
+.pixel-footnote { margin: 0; color: var(--sub-ink); font-size: 16px; }
+@media (max-width: 600px) {
+  .hub { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+  .tile { padding: 12px 5px; }
+  .tile-head, .pixel-tile-icon { width: 54px; height: 54px; }
+  .pixel-tile-icon { font-size: 40px; }
+  .tile-title { font-size: 9px; }
+  .tile-sub { font-size: 9px; text-align: center; }
+  .pixel-controls { grid-template-columns: 1fr; }
+  .pixel-heading { flex-direction: column; }
 }

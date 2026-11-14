@@ -330,7 +330,7 @@ function render(d, isInitial) {
 
 // ---- Tabs (Creeper = servers, Steve = players) ------------------------------
 function setView(view, updateHash = true) {
-  if (view !== 'server' && view !== 'player') view = 'server';
+  if (!['server', 'player', 'pixel'].includes(view)) view = 'server';
   const previous = currentView;
   currentView = view;
   document.querySelectorAll('.tile').forEach(t => {
@@ -340,14 +340,15 @@ function setView(view, updateHash = true) {
   });
   $('#view-server').hidden = view !== 'server';
   $('#view-player').hidden = view !== 'player';
+  $('#view-pixel').hidden = view !== 'pixel';
   if (updateHash && location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
 
-  if (view === 'player') {
+  if (view !== 'server') {
     // Pause live server polling (and hide its LIVE badge) while the player tab is open.
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
     $('#liveBadge').hidden = true;
-    if (previous !== 'player') setTimeout(() => $('#pname').focus(), 0);
-  } else if (previous === 'player' && currentTarget && !pollTimer) {
+    if (view === 'player' && previous !== 'player') setTimeout(() => $('#pname').focus(), 0);
+  } else if (previous !== 'server' && currentTarget && !pollTimer) {
     $('#liveBadge').hidden = false;
     fetchStatus(false);
   }

@@ -33,3 +33,23 @@ uses PostgreSQL when this variable is set.
 ## Server icons
 Minecraft server icons are returned directly to the browser as data URLs. The app no
 longer writes downloaded server icons to `saved_icons/` or stores them on the server.
+
+## PixelCraft Studio (image to Litematica)
+The **Pixel Art** tile lets visitors upload a PNG/JPG/WEBP image, preview a square pixel-art conversion, choose a block family (Concrete, Wool or Terracotta), set resolution and wall depth, then download a `.litematic` schematic.
+
+The export endpoint builds a flat wall (or a thicker extruded wall) using vanilla Minecraft blocks. Images are processed in memory and are not saved as permanent uploads. The upload limit is 8 MB and the maximum preview resolution is 128 x 128.
+
+### Install / deploy
+The required packages are listed in `requirements.txt`. Locally, run:
+```bash
+pip install -r requirements.txt
+python server.py
+```
+On Render, commit the updated `requirements.txt` and redeploy so the new `Pillow` and `litemapy` dependencies are installed. The tool requires the Python backend; it cannot generate `.litematic` files on a static-only host.
+
+### Use in Minecraft
+1. Download the `.litematic` file.
+2. Put it in the Litematica schematics folder (or use Litematica's Schematic Manager to load it).
+3. Load the schematic and place the placement in the world.
+
+The image becomes a square wall. The selected depth repeats each pixel's block along the Z axis.

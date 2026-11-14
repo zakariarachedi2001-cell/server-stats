@@ -6,6 +6,20 @@ let currentTarget = null;
 let previousPlayers = new Set();
 let activityLog = [];
 
+// Count each browser once using a first-party, long-lived cookie.
+async function loadVisitorCount() {
+  const countEl = $('#visitorCount');
+  try {
+    const response = await fetch('/api/visitors', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Visitor counter unavailable');
+    const data = await response.json();
+    countEl.textContent = Number(data.unique_visitors || 0).toLocaleString();
+  } catch {
+    countEl.textContent = '—';
+  }
+}
+loadVisitorCount();
+
 // Theme Management (Dark / Light Mode)
 const savedTheme = localStorage.getItem('mc_checker_theme') || 'dark';
 applyTheme(savedTheme);
@@ -228,8 +242,8 @@ function render(d, isInitial) {
     if (icon.src !== d.icon) icon.src = d.icon;
     dl.hidden = false;
     $('#noicon').hidden = true;
-    dl.href = `/icons/${d.icon_file}?dl=1`;
-    dl.download = d.icon_file;
+    dl.href = d.icon;
+    dl.download = `${(d.host || 'minecraft-server').replace(/[^a-z0-9._-]/gi, '_')}-${d.port || 25565}.png`;
   } else {
     icon.src = '/static/logo.svg';
     dl.hidden = true;

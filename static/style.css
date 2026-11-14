@@ -91,6 +91,31 @@ main {
   margin-bottom: 18px;
 }
 
+.visitor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 5px 12px;
+  color: var(--accent-green);
+  background: var(--panel-bg);
+  border: 3px solid var(--border-col);
+  box-shadow: inset 3px 3px 0 var(--panel-highlight), inset -3px -3px 0 var(--panel-shadow);
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+}
+
+.visitor-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.visitor-badge strong {
+  color: var(--accent-gold);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
 .live-badge {
   display: inline-flex;
   align-items: center;
@@ -508,6 +533,8 @@ h2 {
 }
 
 @media (max-width: 600px) {
+  .top-bar { flex-wrap: wrap; }
+  .visitor-badge { font-size: 10px; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .row { flex-direction: column; }
   .listing { flex-direction: column; align-items: flex-start; }

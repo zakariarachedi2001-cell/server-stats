@@ -9,8 +9,9 @@ let currentView = 'server';
 
 // ---- Visitor counter -------------------------------------------------------
 // The browser is registered once (first-party cookie, no IPs), then the count is
-// refreshed every second. Polling pauses while the tab is hidden.
-const VISITOR_POLL_MS = 1000;
+// refreshed every 20 seconds. Polling pauses while the tab is hidden.
+const VISITOR_POLL_MS = 20000;
+const STATUS_POLL_MS = 3000;
 let lastVisitorCount = null;
 
 function showVisitorCount(value) {
@@ -52,12 +53,16 @@ registerVisitor().finally(pollVisitors);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) pollVisitors(); });
 
 // Theme Management (Dark / Light Mode)
-const savedTheme = localStorage.getItem('mc_checker_theme') || 'dark';
+function readTheme() {
+  try { return localStorage.getItem('mc_checker_theme') === 'light' ? 'light' : 'dark'; }
+  catch { return 'dark'; }
+}
+const savedTheme = readTheme();
 applyTheme(savedTheme);
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('mc_checker_theme', theme);
+  try { localStorage.setItem('mc_checker_theme', theme); } catch { /* storage blocked */ }
   $('#themeIcon').textContent = theme === 'dark' ? '☀️' : '🌙';
   $('#themeLabel').textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
 }
@@ -122,15 +127,20 @@ function legacy(text, st) {
 }
 
 // JSON Chat Component parser
-function comp(c, parent = {}) {
+function comp(c, parent = {}, depth = 0) {
+  if (depth > 20 || c === null || typeof c !== 'object' && typeof c !== 'string') return '';
   if (typeof c === 'string') return legacy(c, parent);
-  if (Array.isArray(c)) return c.map(x => comp(x, parent)).join('');
+  if (Array.isArray(c)) return c.map(x => comp(x, parent, depth + 1)).join('');
   const st = { ...parent };
-  if (c.color) st.color = c.color.startsWith('#') ? c.color : (CODES[NAMES[c.color]] || st.color);
+  if (typeof c.color === 'string') {
+    // Only accept #RRGGBB or a known colour name: the value ends up inside a style attribute.
+    if (/^#[0-9a-fA-F]{6}$/.test(c.color)) st.color = c.color;
+    else if (c.color in NAMES) st.color = CODES[NAMES[c.color]];
+  }
   for (const [k, v] of [['bold', 'b'], ['italic', 'i'], ['underlined', 'u'], ['strikethrough', 's'], ['obfuscated', 'o']]) {
     if (c[k] !== undefined) st[v] = !!c[k];
   }
-  return legacy(c.text || '', st) + (c.extra || []).map(x => comp(x, st)).join('');
+  return legacy(typeof c.text === 'string' ? c.text : '', st) + (Array.isArray(c.extra) ? c.extra : []).map(x => comp(x, st, depth + 1)).join('');
 }
 
 const renderMotd = raw => comp(raw);
@@ -183,9 +193,9 @@ async function startTracking() {
   await fetchStatus(true);
 }
 
-function scheduleNext(target) {
+function scheduleNext(target, delay = STATUS_POLL_MS) {
   if (currentTarget !== target || currentView !== 'server') return;
-  pollTimer = setTimeout(() => fetchStatus(false), 1000);
+  pollTimer = setTimeout(() => fetchStatus(false), delay);
 }
 
 async function fetchStatus(isInitial = false) {
@@ -199,6 +209,7 @@ async function fetchStatus(isInitial = false) {
     const d = await r.json();
 
     if (currentTarget !== target) return;
+    const retryDelay = r.status === 429 ? 10000 : STATUS_POLL_MS;
 
     if (d.error) {
       if (isInitial) {
@@ -209,14 +220,14 @@ async function fetchStatus(isInitial = false) {
         // Keep polling so the page recovers by itself when the server comes back.
         $('#statStatus').textContent = 'OFFLINE';
         $('#statStatus').className = 'stat-value offline-txt';
-        $('#liveText').textContent = 'RETRYING • 1s';
-        scheduleNext(target);
+        $('#liveText').textContent = r.status === 429 ? 'SLOWING DOWN' : 'RETRYING';
+        scheduleNext(target, retryDelay);
       }
       return;
     }
 
     showMsg('');
-    $('#liveText').textContent = 'LIVE • 1s';
+    $('#liveText').textContent = 'LIVE • 3s';
     $('#liveBadge').hidden = false;
     $('#stopBtn').hidden = false;
     render(d, isInitial);
@@ -282,7 +293,7 @@ function render(d, isInitial) {
   $('#lcount').textContent = `${d.players_online}/${d.players_max}`;
 
   const icon = $('#icon'), dl = $('#dl');
-  if (d.icon) {
+  if (typeof d.icon === 'string' && d.icon.startsWith('data:image/png;base64,')) {
     if (icon.src !== d.icon) icon.src = d.icon;
     dl.hidden = false;
     $('#noicon').hidden = true;
@@ -317,7 +328,17 @@ function render(d, isInitial) {
   ul.innerHTML = '';
   d.players.forEach(p => {
     const li = document.createElement('li');
-    li.innerHTML = `<img src="https://minotar.net/helm/${encodeURIComponent(p.name)}/32.png" alt="" onerror="this.style.visibility='hidden'"><span>${legacy(p.name, {})}</span>`;
+    // Only real-looking usernames get an avatar request; no inline handlers (CSP-safe).
+    if (/^[A-Za-z0-9_]{1,16}$/.test(p.name)) {
+      const img = document.createElement('img');
+      img.alt = ''; img.width = img.height = 32;
+      img.src = `https://minotar.net/helm/${encodeURIComponent(p.name)}/32.png`;
+      img.addEventListener('error', () => { img.style.visibility = 'hidden'; });
+      li.appendChild(img);
+    }
+    const nameEl = document.createElement('span');
+    nameEl.innerHTML = legacy(String(p.name), {}); // legacy() escapes all text
+    li.appendChild(nameEl);
     ul.appendChild(li);
   });
 
@@ -337,6 +358,7 @@ function setView(view, updateHash = true) {
     const on = t.dataset.view === view;
     t.classList.toggle('active', on);
     t.setAttribute('aria-selected', on);
+    t.tabIndex = on ? 0 : -1;
   });
   $('#view-server').hidden = view !== 'server';
   $('#view-player').hidden = view !== 'player';
@@ -354,6 +376,19 @@ function setView(view, updateHash = true) {
   }
 }
 document.querySelectorAll('.tile').forEach(t => t.onclick = () => setView(t.dataset.view));
+document.querySelector('.hub').addEventListener('keydown', e => {
+  const tiles = [...document.querySelectorAll('.tile')];
+  const i = tiles.findIndex(t => t.dataset.view === currentView);
+  let n = -1;
+  if (e.key === 'ArrowRight') n = (i + 1) % tiles.length;
+  else if (e.key === 'ArrowLeft') n = (i - 1 + tiles.length) % tiles.length;
+  else if (e.key === 'Home') n = 0;
+  else if (e.key === 'End') n = tiles.length - 1;
+  if (n < 0) return;
+  e.preventDefault();
+  setView(tiles[n].dataset.view);
+  tiles[n].focus();
+});
 window.addEventListener('hashchange', () => setView(location.hash.slice(1), false));
 
 // ---- Player lookup -----------------------------------------------------------

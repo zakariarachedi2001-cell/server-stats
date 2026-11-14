@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minecraft Server &amp; Player Checker</title>
+  <meta name="description" content="Check Minecraft Java and Bedrock server status live, look up any player's UUID, skin and cape, and turn images into Litematica schematics.">
+  <meta name="theme-color" content="#16181d">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Minecraft Server &amp; Player Checker">
+  <meta property="og:description" content="Live server status, player UUID/skin lookup and an image to Litematica converter.">
+  <meta property="og:image" content="/static/logo.svg">
+  <meta name="twitter:card" content="summary">
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,11 +24,11 @@
       <span class="visitor-icon" aria-hidden="true">👥</span>
       <span class="visitor-label">VISITORS</span>
       <strong id="visitorCount">—</strong>
-      <span class="visitor-dot" title="Updates every second" aria-hidden="true"></span>
+      <span class="visitor-dot" title="Updates every 20 seconds" aria-hidden="true"></span>
     </div>
     <div class="live-badge" id="liveBadge" hidden>
       <span class="pulse-dot"></span>
-      <span id="liveText">LIVE • 1s</span>
+      <span id="liveText" aria-live="off">LIVE • 3s</span>
     </div>
     <button type="button" id="themeToggle" class="mc-btn small" aria-label="Toggle Light/Dark Theme">
       <span id="themeIcon">☀️</span> <span id="themeLabel">Light Mode</span>
@@ -64,7 +71,7 @@
       <button id="go" class="mc-btn green">Check</button>
       <button id="stopBtn" class="mc-btn red" hidden>Stop</button>
     </div>
-    <p id="msg" class="msg" hidden></p>
+    <p id="msg" class="msg" role="alert" hidden></p>
   </section>
 
   <section id="result" hidden>
@@ -131,7 +138,7 @@
         <input id="pname" class="mc-input" placeholder="Notch, jeb_ or a UUID" autocomplete="off" spellcheck="false" maxlength="40">
         <button id="pgo" class="mc-btn green">Search</button>
       </div>
-      <p id="pmsg" class="msg" hidden></p>
+      <p id="pmsg" class="msg" role="alert" hidden></p>
     </section>
 
     <section id="presult" hidden>
@@ -185,7 +192,7 @@
         <span class="hint">PNG, JPG or WEBP · Up to 8 MB</span>
         <input id="pixelFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
       </label>
-      <p id="pixelMsg" class="msg" hidden></p>
+      <p id="pixelMsg" class="msg" role="status" aria-live="polite" hidden></p>
       <div class="pixel-controls">
         <label>Resolution
           <select id="pixelResolution" class="mc-input">
@@ -211,6 +218,10 @@
             <option value="3">3 blocks</option>
             <option value="4">4 blocks</option>
           </select>
+        </label>
+        <label class="pixel-check" for="pixelDither">
+          <input id="pixelDither" type="checkbox">
+          <span>Dithering (smoother gradients, more detail in photos)</span>
         </label>
       </div>
       <div class="pixel-preview-wrap">

@@ -9,7 +9,7 @@ Open http://127.0.0.1:5000
 
 ## Tools
 The two tiles at the top switch between tools (also reachable via `#server` / `#player`):
-- **Creeper tile - Servers:** live Java/Bedrock status refreshed every second, MOTD, icon download.
+- **Creeper tile - Servers:** live Java/Bedrock status refreshed every 3 seconds, MOTD, icon download.
 - **Steve tile - Players:** enter a Java username or UUID to see the UUID (dashed, compact, int-array),
   offline-mode UUID, skin model, cape, front/back skin preview, and download the skin, head or cape.
   Data comes from Mojang's public API (cached for 2 minutes); skins are proxied through
@@ -35,7 +35,7 @@ Minecraft server icons are returned directly to the browser as data URLs. The ap
 longer writes downloaded server icons to `saved_icons/` or stores them on the server.
 
 ## PixelCraft Studio (image to Litematica)
-The **Pixel Art** tile lets visitors upload a PNG/JPG/WEBP image, preview a square pixel-art conversion, choose a block family (Concrete, Wool or Terracotta), set resolution and wall depth, then download a `.litematic` schematic.
+The **Pixel Art** tile lets visitors upload a PNG/JPG/WEBP image, preview a square pixel-art conversion, choose a block family (Concrete, Wool or Terracotta), set resolution and wall depth, optionally enable dithering, then download a `.litematic` schematic.
 
 The export endpoint builds a flat wall (or a thicker extruded wall) using vanilla Minecraft blocks. Images are processed in memory and are not saved as permanent uploads. The upload limit is 8 MB and the maximum preview resolution is 128 x 128.
 
@@ -53,3 +53,23 @@ On Render, commit the updated `requirements.txt` and redeploy so the new `Pillow
 3. Load the schematic and place the placement in the world.
 
 The image becomes a square wall. The selected depth repeats each pixel's block along the Z axis.
+
+
+## Security & hardening
+- **Rate limiting** per client IP on every API route (status 60/min, player 20/min, texture 60/min, export 6/min,
+  visitor registration 10/min). Concurrency caps protect the workers (`STATUS_CONCURRENCY`, `EXPORT_CONCURRENCY`).
+- **SSRF protection** on the status checker: IPv4/IPv6/bracketed literals are parsed strictly, every resolved address
+  must be globally routable, and the target of SRV redirects is re-checked after lookup. Never set `ALLOW_PRIVATE=1`
+  on a public deployment.
+- **XSS protection**: strict Content-Security-Policy (no inline scripts), MOTD colours are validated before being
+  used in styles, server icons must be a `data:image/png;base64` URL, and all server-provided text is escaped/clipped.
+- **Headers**: CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, COOP, HSTS (HTTPS).
+- **Uploads**: only real PNG/JPEG/WEBP files (checked by content), pixel-count limit against decompression bombs,
+  at most 2 concurrent exports.
+- `TRUST_PROXY=1` (default) trusts exactly one reverse-proxy hop (Render). Set `TRUST_PROXY=0` when running without a proxy.
+- Run the tests with `python -m unittest discover -s tests -v`.
+
+## Deploy on Render
+Build command: `pip install -r requirements.txt`
+Start command: `gunicorn server:app --workers 2 --threads 4 --timeout 60` (also provided in `Procfile`).
+Note: the rate limiter and caches are per worker process. For stricter global limits, put Cloudflare (free) in front of the site.
